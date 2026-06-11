@@ -76,14 +76,22 @@ const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
 };
 #endif
 
-static uint16_t pressTime;
+static uint32_t pressTime;
 static bool isPressed = false;
 static bool isPressTurned = false;
+static uint8_t pressCount;
+static uint32_t pressClock;
+static bool awaitingPress;
+
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
         case KC_VOLU:
         case UG_VALU:
+            // Reset Double-Press Contexts
+            pressCount = 0;
+            awaitingPress = false;
+
             // Intercept volume up keycode to handle press and turn behavior
             if (isPressed) {
                 if(record->event.pressed) {
@@ -97,7 +105,12 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
         case KC_VOLD:
         case UG_VALD:
+            // Reset Double-Press Contexts
+            pressCount = 0;
+            awaitingPress = false;
+
             // Intercept volume down keycode to handle press and turn behavior
+            
             if (isPressed) {
                 if (record->event.pressed) {
                     isPressTurned = true;
@@ -110,16 +123,27 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
         case ENC_BTN:
             if (record->event.pressed) {
-                pressTime = timer_read();
+                pressTime = timer_read32();
                 isPressed = true;
                 isPressTurned = false;
             } else {
                 isPressed = false;
                 if (!isPressTurned) {
-                    if (timer_elapsed(pressTime) >= 300) {
+                    if (timer_elapsed32(pressTime) >= 300) {
                         tap_code16(KC_MPLY);
+                        pressCount = 0;
+                        awaitingPress = false;
                     } else {
-                        tap_code16(KC_F23);
+                        pressCount++;
+                        if (pressCount == 2) {
+                            tap_code16(KC_F22);
+                            pressCount = 0;
+                            awaitingPress = false;
+                        } else {
+                            pressClock = timer_read32();
+                            awaitingPress = true;
+                        }
+                        // tap_code16(KC_F23); we use later?
                     }
                 }
             }
@@ -128,5 +152,15 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
         default:
             return true;
+    }
+}
+
+void matrix_scan_user(void) {
+    if (awaitingPress && !isPressed) {
+        if (timer_elapsed32(pressClock) >= 300) {
+            tap_code16(KC_F23);
+            pressCount = 0;
+            awaitingPress = false;
+        }
     }
 }
