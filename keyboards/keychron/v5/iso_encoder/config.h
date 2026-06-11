@@ -22,3 +22,5 @@
 /* Indications */
 #define CAPS_LOCK_INDEX 51
 #define NUM_LOCK_INDEX 31
+
+#define RGB_MATRIX_TIMEOUT 300000 // 5 minutes in milliseconds
